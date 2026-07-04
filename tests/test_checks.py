@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from sentinel.checks import CommandCheckAdapter
+from sentinel.checks import CommandCheckAdapter, ExternalResultAdapter, FilePolicyAdapter
 from sentinel.models import CheckStatus
 
 
@@ -49,3 +49,38 @@ class CommandCheckAdapterTest(unittest.TestCase):
                     },
                     Path(directory),
                 )
+
+
+class ExternalResultAdapterTest(unittest.TestCase):
+    def test_external_failure_is_normalized(self) -> None:
+        check = ExternalResultAdapter().run(
+            {
+                "name": "dependency-scan",
+                "status": "failed",
+                "evidence": "high-severity vulnerability found",
+                "source": "Trivy",
+            },
+            Path("."),
+        )
+
+        self.assertEqual(check.status, CheckStatus.FAILED)
+        self.assertEqual(check.source, "Trivy")
+
+
+class FilePolicyAdapterTest(unittest.TestCase):
+    def test_required_markers_are_checked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "Caddyfile"
+            path.write_text('Strict-Transport-Security "max-age=31536000"')
+
+            check = FilePolicyAdapter().run(
+                {
+                    "name": "security-headers",
+                    "path": "Caddyfile",
+                    "required": ["Strict-Transport-Security", "max-age=31536000"],
+                    "forbidden": ["Server"],
+                },
+                Path(directory),
+            )
+
+        self.assertEqual(check.status, CheckStatus.PASSED)

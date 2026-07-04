@@ -98,8 +98,72 @@ class CommandCheckAdapter:
                 )
 
 
+class ExternalResultAdapter:
+    kind = "external"
+
+    def run(self, specification: Mapping[str, object], workspace: Path) -> Check:
+        del workspace
+        name = _required_text(specification, "name")
+        evidence = _required_text(specification, "evidence")
+        source = _required_text(specification, "source")
+        try:
+            status = CheckStatus(_required_text(specification, "status"))
+        except ValueError as error:
+            raise ValueError(f"invalid status for check {name}") from error
+        return Check(name, status, evidence, source)
+
+
+class FilePolicyAdapter:
+    kind = "file_policy"
+
+    def run(self, specification: Mapping[str, object], workspace: Path) -> Check:
+        name = _required_text(specification, "name")
+        relative_path = _required_text(specification, "path")
+        path = _workspace_file(workspace, relative_path)
+        required = specification.get("required")
+        if (
+            not isinstance(required, list)
+            or not required
+            or any(not isinstance(item, str) or not item for item in required)
+        ):
+            raise ValueError("required must be a non-empty string list")
+        forbidden = specification.get("forbidden", [])
+        if not isinstance(forbidden, list) or any(
+            not isinstance(item, str) or not item for item in forbidden
+        ):
+            raise ValueError("forbidden must be a string list")
+
+        content = path.read_text(encoding="utf-8")
+        missing = [item for item in required if item not in content]
+        present = [item for item in forbidden if item in content]
+        if missing or present:
+            details: list[str] = []
+            if missing:
+                details.append(f"missing: {', '.join(missing)}")
+            if present:
+                details.append(f"forbidden: {', '.join(present)}")
+            return Check(
+                name,
+                CheckStatus.FAILED,
+                "; ".join(details),
+                relative_path,
+            )
+        return Check(
+            name,
+            CheckStatus.PASSED,
+            f"{len(required)} required and {len(forbidden)} forbidden markers checked",
+            relative_path,
+        )
+
+
 def default_registry() -> CheckRegistry:
-    return CheckRegistry((CommandCheckAdapter(),))
+    return CheckRegistry(
+        (
+            CommandCheckAdapter(),
+            ExternalResultAdapter(),
+            FilePolicyAdapter(),
+        )
+    )
 
 
 def _command(value: object) -> list[str]:
@@ -124,6 +188,16 @@ def _working_directory(workspace: Path, value: object) -> Path:
         raise ValueError("working_directory escapes the workspace")
     if not candidate.is_dir():
         raise ValueError(f"working_directory does not exist: {value}")
+    return candidate
+
+
+def _workspace_file(workspace: Path, value: str) -> Path:
+    root = workspace.resolve()
+    candidate = (root / value).resolve()
+    if not candidate.is_relative_to(root):
+        raise ValueError("path escapes the workspace")
+    if not candidate.is_file():
+        raise ValueError(f"file does not exist: {value}")
     return candidate
 
 
