@@ -27,7 +27,7 @@ class AnalysisTest(unittest.TestCase):
         self.assertEqual(result.provider, "mock")
         self.assertEqual(result.decision, "advisory")
         self.assertEqual(result.analyzed_at, "2026-07-04T12:00:00Z")
-        self.assertIn("passed all supplied checks", result.summary)
+        self.assertEqual(result.summary, "All supplied checks passed.")
 
     def test_failed_check_produces_high_risk(self) -> None:
         result = assess(

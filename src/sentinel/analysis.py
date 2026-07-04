@@ -35,10 +35,10 @@ class MockAnalysisProvider:
             check.name for check in checks if check.status == CheckStatus.WARNING
         ]
         if failed:
-            return f"{project} has failed checks: {', '.join(failed)}."
+            return f"Failed checks: {', '.join(failed)}."
         if warnings:
-            return f"{project} passed with warnings: {', '.join(warnings)}."
-        return f"{project} passed all supplied checks."
+            return f"Checks passed with warnings: {', '.join(warnings)}."
+        return "All supplied checks passed."
 
 
 def assess(
