@@ -2,7 +2,9 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Protocol
 
+from sentinel.config import PolicyConfig
 from sentinel.models import Assessment, Check, CheckStatus, Risk
+from sentinel.policy import evaluate
 
 
 class AnalysisProvider(Protocol):
@@ -42,6 +44,8 @@ class MockAnalysisProvider:
 def assess(
     payload: Mapping[str, object],
     provider: AnalysisProvider,
+    policy: PolicyConfig | None = None,
+    advisory_only: bool = True,
     analyzed_at: datetime | None = None,
 ) -> Assessment:
     project = _required_text(payload, "project")
@@ -53,6 +57,8 @@ def assess(
 
     checks = tuple(_parse_check(item) for item in raw_checks)
     risk = _risk(checks)
+    configured_policy = policy or PolicyConfig(True, True, True)
+    decision = evaluate(checks, risk, configured_policy, advisory_only)
     summary = provider.summarize(project, commit, risk, checks)
     timestamp = (analyzed_at or datetime.now(UTC)).astimezone(UTC)
 
@@ -61,6 +67,7 @@ def assess(
         commit,
         timestamp.isoformat().replace("+00:00", "Z"),
         risk,
+        decision,
         checks,
         summary,
         provider.name,

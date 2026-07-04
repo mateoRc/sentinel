@@ -38,9 +38,14 @@ Create the assessment:
 sentinel assess \
   --provider mock \
   --input evidence.json \
+  --config ../lab/sentinel.yml \
   --json-output assessment.json \
   --markdown-output assessment.md
 ```
+
+With `advisory_only: true`, findings are reported without failing CI. Setting it
+to `false` makes blocked or approval-required decisions return a non-zero exit
+code.
 
 Run tests with:
 

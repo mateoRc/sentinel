@@ -19,6 +19,7 @@ def write_markdown(assessment: Assessment, path: Path) -> None:
         f"- Project: `{assessment.project}`",
         f"- Commit: `{assessment.commit}`",
         f"- Risk: **{assessment.risk}**",
+        f"- Decision: **{assessment.decision}**",
         f"- Analysis provider: `{assessment.provider}`",
         "",
         assessment.summary,

@@ -28,6 +28,7 @@ class Assessment:
     commit: str
     analyzed_at: str
     risk: Risk
+    decision: str
     checks: tuple[Check, ...]
     summary: str
     provider: str

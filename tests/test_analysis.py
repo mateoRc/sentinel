@@ -20,11 +20,12 @@ class AnalysisTest(unittest.TestCase):
                 ],
             },
             MockAnalysisProvider(),
-            datetime(2026, 7, 4, 12, 0, tzinfo=UTC),
+            analyzed_at=datetime(2026, 7, 4, 12, 0, tzinfo=UTC),
         )
 
         self.assertEqual(result.risk, Risk.LOW)
         self.assertEqual(result.provider, "mock")
+        self.assertEqual(result.decision, "advisory")
         self.assertEqual(result.analyzed_at, "2026-07-04T12:00:00Z")
         self.assertIn("passed all supplied checks", result.summary)
 
