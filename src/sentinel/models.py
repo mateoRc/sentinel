@@ -25,6 +25,7 @@ class Check:
 class Assessment:
     project: str
     commit: str
+    analyzed_at: str
     risk: Risk
     checks: tuple[Check, ...]
     summary: str

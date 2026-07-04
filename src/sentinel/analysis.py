@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Protocol
 
 from sentinel.models import Assessment, Check, CheckStatus, Risk
@@ -41,6 +42,7 @@ class MockAnalysisProvider:
 def assess(
     payload: Mapping[str, object],
     provider: AnalysisProvider,
+    analyzed_at: datetime | None = None,
 ) -> Assessment:
     project = _required_text(payload, "project")
     commit = _required_text(payload, "commit")
@@ -51,7 +53,16 @@ def assess(
     checks = tuple(_parse_check(item) for item in raw_checks)
     risk = _risk(checks)
     summary = provider.summarize(project, commit, risk, checks)
-    return Assessment(project, commit, risk, checks, summary, provider.name)
+    timestamp = (analyzed_at or datetime.now(UTC)).astimezone(UTC)
+    return Assessment(
+        project,
+        commit,
+        timestamp.isoformat().replace("+00:00", "Z"),
+        risk,
+        checks,
+        summary,
+        provider.name,
+    )
 
 
 def _parse_check(value: object) -> Check:
