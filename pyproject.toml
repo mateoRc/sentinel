@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "release-sentinel"
+version = "0.1.0.dev0"
+description = "Evidence-based CI/CD release risk analysis."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+    { name = "Mateo Mahmutović", email = "mmateo19992@gmail.com" },
+]
+
+[project.scripts]
+sentinel = "sentinel.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
