@@ -47,6 +47,7 @@ def assess(
     project = _required_text(payload, "project")
     commit = _required_text(payload, "commit")
     raw_checks = payload.get("checks")
+
     if not isinstance(raw_checks, list) or not raw_checks:
         raise ValueError("checks must be a non-empty list")
 
@@ -54,6 +55,7 @@ def assess(
     risk = _risk(checks)
     summary = provider.summarize(project, commit, risk, checks)
     timestamp = (analyzed_at or datetime.now(UTC)).astimezone(UTC)
+
     return Assessment(
         project,
         commit,
@@ -70,24 +72,32 @@ def _parse_check(value: object) -> Check:
         raise ValueError("each check must be an object")
     name = _required_text(value, "name")
     evidence = _required_text(value, "evidence")
+    source = value.get("source", "supplied evidence")
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError(f"source must be a non-empty string for check {name}")
+
     try:
         status = CheckStatus(_required_text(value, "status"))
     except ValueError as error:
         raise ValueError(f"invalid status for check {name}") from error
-    return Check(name, status, evidence)
+
+    return Check(name, status, evidence, source.strip())
 
 
 def _required_text(value: Mapping[str, object], key: str) -> str:
     item = value.get(key)
     if not isinstance(item, str) or not item.strip():
         raise ValueError(f"{key} must be a non-empty string")
+
     return item.strip()
 
 
 def _risk(checks: tuple[Check, ...]) -> Risk:
     statuses = {check.status for check in checks}
+
     if CheckStatus.FAILED in statuses:
         return Risk.HIGH
+
     if CheckStatus.WARNING in statuses:
         return Risk.MEDIUM
     return Risk.LOW

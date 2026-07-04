@@ -19,6 +19,7 @@ class Check:
     name: str
     status: CheckStatus
     evidence: str
+    source: str
 
 
 @dataclass(frozen=True)

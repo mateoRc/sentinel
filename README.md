@@ -21,6 +21,20 @@ evidence but cannot override failed checks, write repositories, or deploy.
 
 ```sh
 python -m pip install --editable .
+```
+
+Collect deterministic evidence from an allowlisted check plan:
+
+```sh
+sentinel collect \
+  --plan plan.json \
+  --workspace . \
+  --output evidence.json
+```
+
+Create the assessment:
+
+```sh
 sentinel assess \
   --provider mock \
   --input evidence.json \

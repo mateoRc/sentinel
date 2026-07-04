@@ -25,11 +25,16 @@ def write_markdown(assessment: Assessment, path: Path) -> None:
         "",
         "## Evidence",
         "",
-        "| Check | Status | Evidence |",
-        "| --- | --- | --- |",
+        "| Check | Status | Source | Evidence |",
+        "| --- | --- | --- | --- |",
     ]
     rows.extend(
-        f"| {check.name} | {check.status} | {check.evidence} |"
+        f"| {_cell(check.name)} | {check.status} | "
+        f"{_cell(check.source)} | {_cell(check.evidence)} |"
         for check in assessment.checks
     )
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+
+def _cell(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
