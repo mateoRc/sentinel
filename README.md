@@ -16,6 +16,8 @@ tests and scanners -> normalized evidence -> policy and risk
 
 Deterministic checks own pass/fail decisions. Analysis providers explain the
 evidence but cannot override failed checks, write repositories, or deploy.
+Reports include sanitized findings and deterministic remediation actions;
+secret values and raw scanner output are never public dashboard data.
 
 ## Run
 

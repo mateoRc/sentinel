@@ -27,7 +27,8 @@ class AnalysisTest(unittest.TestCase):
         self.assertEqual(result.provider, "mock")
         self.assertEqual(result.decision, "advisory")
         self.assertEqual(result.analyzed_at, "2026-07-04T12:00:00Z")
-        self.assertEqual(result.summary, "All supplied checks passed.")
+        self.assertEqual(result.summary, "All 1 check passed.")
+        self.assertEqual(result.actions, ())
 
     def test_failed_check_produces_high_risk(self) -> None:
         result = assess(
@@ -46,7 +47,11 @@ class AnalysisTest(unittest.TestCase):
         )
 
         self.assertEqual(result.risk, Risk.HIGH)
-        self.assertIn("security", result.summary)
+        self.assertEqual(result.summary, "1 of 1 check failed: security.")
+        self.assertEqual(
+            result.actions,
+            ("Inspect evidence for security and rerun the check.",),
+        )
 
     def test_empty_checks_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "non-empty list"):

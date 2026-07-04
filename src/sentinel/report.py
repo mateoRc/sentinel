@@ -34,6 +34,9 @@ def write_markdown(assessment: Assessment, path: Path) -> None:
         f"{_cell(check.source)} | {_cell(check.evidence)} |"
         for check in assessment.checks
     )
+    if assessment.actions:
+        rows.extend(["", "## Next actions", ""])
+        rows.extend(f"- {_cell(action)}" for action in assessment.actions)
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 

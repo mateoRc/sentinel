@@ -31,4 +31,5 @@ class Assessment:
     decision: str
     checks: tuple[Check, ...]
     summary: str
+    actions: tuple[str, ...]
     provider: str

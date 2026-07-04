@@ -35,10 +35,18 @@ class MockAnalysisProvider:
             check.name for check in checks if check.status == CheckStatus.WARNING
         ]
         if failed:
-            return f"Failed checks: {', '.join(failed)}."
+            labels = ", ".join(_label(name) for name in failed)
+            return (
+                f"{len(failed)} of {len(checks)} {_plural(len(checks))} failed: "
+                f"{labels}."
+            )
         if warnings:
-            return f"Checks passed with warnings: {', '.join(warnings)}."
-        return "All supplied checks passed."
+            labels = ", ".join(_label(name) for name in warnings)
+            return (
+                f"{len(warnings)} of {len(checks)} {_plural(len(checks))} warned: "
+                f"{labels}."
+            )
+        return f"All {len(checks)} {_plural(len(checks))} passed."
 
 
 def assess(
@@ -60,6 +68,7 @@ def assess(
     configured_policy = policy or PolicyConfig(True, True, True)
     decision = evaluate(checks, risk, configured_policy, advisory_only)
     summary = provider.summarize(project, commit, risk, checks)
+    actions = _recommended_actions(checks)
     timestamp = (analyzed_at or datetime.now(UTC)).astimezone(UTC)
 
     return Assessment(
@@ -70,6 +79,7 @@ def assess(
         decision,
         checks,
         summary,
+        actions,
         provider.name,
     )
 
@@ -108,3 +118,40 @@ def _risk(checks: tuple[Check, ...]) -> Risk:
     if CheckStatus.WARNING in statuses:
         return Risk.MEDIUM
     return Risk.LOW
+
+
+def _recommended_actions(checks: tuple[Check, ...]) -> tuple[str, ...]:
+    actions: list[str] = []
+    for check in checks:
+        if check.status == CheckStatus.PASSED:
+            continue
+        if "image-security" in check.name:
+            action = (
+                "Update affected packages or base images to listed fixed versions, "
+                "then rebuild and rescan."
+            )
+        elif check.name == "repository-security":
+            action = (
+                "Update vulnerable dependencies and rotate or remove detected secrets."
+            )
+        elif check.name.endswith("-tests"):
+            action = "Inspect the failed test build, fix it, and rerun the release checks."
+        elif check.name.startswith("compose-"):
+            action = "Correct the Compose configuration and validate it locally."
+        elif check.name == "security-headers":
+            action = "Restore the missing security headers in the Caddy configuration."
+        elif check.name == "internal-network":
+            action = "Remove exposed backend ports and restore the internal network."
+        else:
+            action = f"Inspect evidence for {_label(check.name)} and rerun the check."
+        if action not in actions:
+            actions.append(action)
+    return tuple(actions)
+
+
+def _label(name: str) -> str:
+    return name.replace("-", " ")
+
+
+def _plural(count: int) -> str:
+    return "check" if count == 1 else "checks"
