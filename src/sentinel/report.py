@@ -3,6 +3,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from sentinel.models import Assessment
+from sentinel.redaction import redact
 
 
 def write_json(assessment: Assessment, path: Path) -> None:
@@ -41,4 +42,9 @@ def write_markdown(assessment: Assessment, path: Path) -> None:
 
 
 def _cell(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+    return (
+        redact(value)
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\n", " ")
+    )

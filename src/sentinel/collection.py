@@ -3,6 +3,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from sentinel.checks import CheckRegistry
+from sentinel.redaction import redact
 
 
 def collect(
@@ -15,7 +16,15 @@ def collect(
     specifications = plan.get("checks")
     if not isinstance(specifications, list) or not specifications:
         raise ValueError("checks must be a non-empty list")
-    checks = registry.run_all(specifications, workspace)
+    checks = tuple(
+        type(check)(
+            redact(check.name),
+            check.status,
+            redact(check.evidence),
+            redact(check.source),
+        )
+        for check in registry.run_all(specifications, workspace)
+    )
     return {
         "project": project,
         "commit": commit,

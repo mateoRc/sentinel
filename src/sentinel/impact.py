@@ -29,9 +29,15 @@ def _paths(changes: list[object]) -> tuple[str, ...]:
     for item in changes:
         if not isinstance(item, str) or not item.strip():
             raise ValueError("changes must be a list of non-empty paths")
-        path = item.strip().replace("\\", "/").lstrip("./")
+        path = item.strip().replace("\\", "/")
         if path.startswith("../") or path == "..":
             raise ValueError("changed path escapes the workspace")
+        if path.startswith("/"):
+            raise ValueError("changed path must be relative")
+        while path.startswith("./"):
+            path = path[2:]
+        if not path:
+            raise ValueError("changed path must not be empty")
         normalized.add(path)
     if not normalized:
         raise ValueError("changes must not be empty")

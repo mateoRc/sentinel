@@ -77,7 +77,7 @@ class CommandCheckAdapter:
                         name,
                         CheckStatus.PASSED,
                         f"completed in {duration:.1f}s",
-                        " ".join(command),
+                        redact(" ".join(command), environment.values()),
                     )
                 return Check(
                     name,
@@ -93,13 +93,13 @@ class CommandCheckAdapter:
                     name,
                     CheckStatus.FAILED,
                     f"timed out after {timeout}s",
-                    " ".join(command),
+                    redact(" ".join(command), environment.values()),
                 )
             except OSError as error:
                 return Check(
                     name,
                     CheckStatus.FAILED,
-                    f"could not start: {error}",
+                    redact(f"could not start: {error}", environment.values()),
                     redact(" ".join(command), environment.values()),
                 )
 

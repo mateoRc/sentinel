@@ -2,9 +2,14 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from sentinel.checks import CommandCheckAdapter, ExternalResultAdapter, FilePolicyAdapter
+from sentinel.checks import (
+    CommandCheckAdapter,
+    ExternalResultAdapter,
+    FilePolicyAdapter,
+    HTTPJSONCheckAdapter,
+)
 from sentinel.models import CheckStatus
 
 
@@ -50,6 +55,23 @@ class CommandCheckAdapterTest(unittest.TestCase):
                     Path(directory),
                 )
 
+    def test_failure_output_redacts_environment_secrets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with patch(
+                "sentinel.checks.subprocess.run",
+                side_effect=OSError("token local-secret-value rejected"),
+            ):
+                check = CommandCheckAdapter().run(
+                    {
+                        "name": "container-tests",
+                        "command": ["docker", "build", "."],
+                        "environment": {"AUTH_TOKEN": "local-secret-value"},
+                    },
+                    Path(directory),
+                )
+
+        self.assertNotIn("local-secret-value", check.evidence)
+
 
 class ExternalResultAdapterTest(unittest.TestCase):
     def test_external_failure_is_normalized(self) -> None:
@@ -84,3 +106,35 @@ class FilePolicyAdapterTest(unittest.TestCase):
             )
 
         self.assertEqual(check.status, CheckStatus.PASSED)
+
+
+class HTTPJSONCheckAdapterTest(unittest.TestCase):
+    def test_expected_json_fields_are_checked(self) -> None:
+        response = MagicMock()
+        response.read.return_value = b'{"exit_code":0,"output":"# About"}'
+        response.__enter__.return_value = response
+        with patch("sentinel.checks.urllib.request.urlopen", return_value=response):
+            check = HTTPJSONCheckAdapter().run(
+                {
+                    "name": "vault-contract",
+                    "url": "http://127.0.0.1:8080/api/exec",
+                    "json": {"line": "cat /cv/about.md"},
+                    "expected": {"exit_code": 0},
+                    "contains": {"output": "# About"},
+                },
+                Path("."),
+            )
+
+        self.assertEqual(check.status, CheckStatus.PASSED)
+
+    def test_non_local_url_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "local HTTP"):
+            HTTPJSONCheckAdapter().run(
+                {
+                    "name": "unsafe",
+                    "url": "https://example.com",
+                    "json": {},
+                    "expected": {"ok": True},
+                },
+                Path("."),
+            )

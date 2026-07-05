@@ -8,6 +8,7 @@ from sentinel.analysis import MockAnalysisProvider, assess
 from sentinel.checks import default_registry
 from sentinel.collection import collect, write_evidence
 from sentinel.config import load_configuration
+from sentinel.impact import analyze, write_impact
 from sentinel.policy import Decision
 from sentinel.report import write_json, write_markdown
 
@@ -26,6 +27,13 @@ def build_parser() -> argparse.ArgumentParser:
     collect_parser.add_argument("--plan", type=Path, required=True)
     collect_parser.add_argument("--workspace", type=Path, required=True)
     collect_parser.add_argument("--output", type=Path, required=True)
+    impact_parser = subparsers.add_parser(
+        "impact",
+        help="Map changed paths to affected repositories, services, and checks.",
+    )
+    impact_parser.add_argument("--changes", type=Path, required=True)
+    impact_parser.add_argument("--rules", type=Path, required=True)
+    impact_parser.add_argument("--output", type=Path, required=True)
     assess_parser = subparsers.add_parser(
         "assess",
         help="Assess check evidence and produce release reports.",
@@ -41,6 +49,18 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    if arguments.command == "impact":
+        try:
+            changes = json.loads(arguments.changes.read_text(encoding="utf-8"))
+            rules = json.loads(arguments.rules.read_text(encoding="utf-8"))
+            if not isinstance(changes, list):
+                raise ValueError("changes must be a JSON list")
+            if not isinstance(rules, dict):
+                raise ValueError("rules must be a JSON object")
+            write_impact(analyze(changes, rules), arguments.output)
+        except (OSError, json.JSONDecodeError, ValueError) as error:
+            parser.error(str(error))
+        return 0
     if arguments.command == "collect":
         try:
             plan = json.loads(arguments.plan.read_text(encoding="utf-8"))
