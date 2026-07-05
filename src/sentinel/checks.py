@@ -58,6 +58,7 @@ class CommandCheckAdapter:
         )
         timeout = _timeout(specification.get("timeout_seconds", 600))
         environment = _environment(specification.get("environment", {}))
+        expected_exit_code = _exit_code(specification.get("expected_exit_code", 0))
 
         started = time.monotonic()
         with tempfile.TemporaryFile() as output:
@@ -72,18 +73,24 @@ class CommandCheckAdapter:
                     check=False,
                 )
                 duration = time.monotonic() - started
-                if completed.returncode == 0:
+                if completed.returncode == expected_exit_code:
                     return Check(
                         name,
                         CheckStatus.PASSED,
-                        f"completed in {duration:.1f}s",
+                        (
+                            f"completed with expected exit {expected_exit_code} "
+                            f"in {duration:.1f}s"
+                        ),
                         redact(" ".join(command), environment.values()),
                     )
                 return Check(
                     name,
                     CheckStatus.FAILED,
                     redact(
-                        f"exit {completed.returncode}: {_tail(output)}",
+                        (
+                            f"exit {completed.returncode}, expected "
+                            f"{expected_exit_code}: {_tail(output)}"
+                        ),
                         environment.values(),
                     ),
                     redact(" ".join(command), environment.values()),
@@ -262,6 +269,12 @@ def _timeout(value: object) -> int:
         raise ValueError("timeout_seconds must be an integer")
     if value <= 0 or value > _MAX_TIMEOUT_SECONDS:
         raise ValueError(f"timeout_seconds must be between 1 and {_MAX_TIMEOUT_SECONDS}")
+    return value
+
+
+def _exit_code(value: object) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 255:
+        raise ValueError("expected_exit_code must be an integer between 0 and 255")
     return value
 
 

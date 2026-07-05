@@ -43,6 +43,36 @@ class CommandCheckAdapterTest(unittest.TestCase):
                     Path(directory),
                 )
 
+    def test_expected_nonzero_exit_is_success(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with patch(
+                "sentinel.checks.subprocess.run",
+                return_value=subprocess.CompletedProcess(["docker"], 1),
+            ):
+                check = CommandCheckAdapter().run(
+                    {
+                        "name": "invalid-token-rejected",
+                        "command": ["docker", "compose", "exec", "service"],
+                        "expected_exit_code": 1,
+                    },
+                    Path(directory),
+                )
+
+        self.assertEqual(check.status, CheckStatus.PASSED)
+        self.assertIn("expected exit 1", check.evidence)
+
+    def test_expected_exit_code_is_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "between 0 and 255"):
+                CommandCheckAdapter().run(
+                    {
+                        "name": "invalid",
+                        "command": ["docker", "version"],
+                        "expected_exit_code": 256,
+                    },
+                    Path(directory),
+                )
+
     def test_working_directory_cannot_escape_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(ValueError, "escapes"):
