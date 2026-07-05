@@ -1,6 +1,6 @@
 # Sentinel
 
-CI/CD release guardian that turns deterministic engineering evidence into an
+An agentic CI/CD release guardian that turns deterministic engineering evidence into an
 explainable release-risk assessment.
 
 Sentinel is a pre-1.0 CLI. Its mock provider enables end-to-end testing before
