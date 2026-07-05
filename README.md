@@ -34,6 +34,15 @@ sentinel collect \
   --output evidence.json
 ```
 
+Map changed paths to affected repositories, services, and check groups:
+
+```sh
+sentinel impact \
+  --changes changes.json \
+  --rules sentinel-impact.json \
+  --output impact.json
+```
+
 Create the assessment:
 
 ```sh
@@ -48,6 +57,11 @@ sentinel assess \
 With `advisory_only: true`, findings are reported without failing CI. Setting it
 to `false` makes blocked or approval-required decisions return a non-zero exit
 code.
+
+Sentinel centrally redacts common credentials and explicit check-environment
+secrets from retained evidence. Its local HTTP adapter supports deterministic
+service-contract and degradation assertions without allowing arbitrary network
+requests.
 
 Run tests with:
 
