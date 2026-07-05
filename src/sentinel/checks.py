@@ -3,11 +3,14 @@ import re
 import subprocess
 import tempfile
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
 from typing import BinaryIO, Protocol
 
 from sentinel.models import Check, CheckStatus
+from sentinel.redaction import redact
 
 _ALLOWED_EXECUTABLES = frozenset({"docker"})
 _ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
@@ -79,8 +82,11 @@ class CommandCheckAdapter:
                 return Check(
                     name,
                     CheckStatus.FAILED,
-                    f"exit {completed.returncode}: {_tail(output)}",
-                    " ".join(command),
+                    redact(
+                        f"exit {completed.returncode}: {_tail(output)}",
+                        environment.values(),
+                    ),
+                    redact(" ".join(command), environment.values()),
                 )
             except subprocess.TimeoutExpired:
                 return Check(
@@ -94,7 +100,7 @@ class CommandCheckAdapter:
                     name,
                     CheckStatus.FAILED,
                     f"could not start: {error}",
-                    " ".join(command),
+                    redact(" ".join(command), environment.values()),
                 )
 
 
@@ -104,13 +110,62 @@ class ExternalResultAdapter:
     def run(self, specification: Mapping[str, object], workspace: Path) -> Check:
         del workspace
         name = _required_text(specification, "name")
-        evidence = _required_text(specification, "evidence")
-        source = _required_text(specification, "source")
+        evidence = redact(_required_text(specification, "evidence"))
+        source = redact(_required_text(specification, "source"))
         try:
             status = CheckStatus(_required_text(specification, "status"))
         except ValueError as error:
             raise ValueError(f"invalid status for check {name}") from error
         return Check(name, status, evidence, source)
+
+
+class HTTPJSONCheckAdapter:
+    kind = "http_json"
+
+    def run(self, specification: Mapping[str, object], workspace: Path) -> Check:
+        del workspace
+        name = _required_text(specification, "name")
+        url = _local_url(_required_text(specification, "url"))
+        payload = specification.get("json")
+        if not isinstance(payload, dict):
+            raise ValueError("json must be an object")
+        expected = specification.get("expected")
+        if not isinstance(expected, dict) or not expected:
+            raise ValueError("expected must be a non-empty object")
+        contains = specification.get("contains", {})
+        if not isinstance(contains, dict):
+            raise ValueError("contains must be an object")
+        timeout = _timeout(specification.get("timeout_seconds", 10))
+        request = urllib.request.Request(
+            url,
+            data=json_bytes(payload),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                value = json_load(response.read())
+        except (OSError, urllib.error.URLError, ValueError) as error:
+            return Check(
+                name,
+                CheckStatus.FAILED,
+                redact(f"request failed: {error}"),
+                url,
+            )
+        mismatches = _mismatches(value, expected, contains)
+        if mismatches:
+            return Check(
+                name,
+                CheckStatus.FAILED,
+                redact("; ".join(mismatches)),
+                url,
+            )
+        return Check(
+            name,
+            CheckStatus.PASSED,
+            f"{len(expected) + len(contains)} response assertions passed",
+            url,
+        )
 
 
 class FilePolicyAdapter:
@@ -162,6 +217,7 @@ def default_registry() -> CheckRegistry:
             CommandCheckAdapter(),
             ExternalResultAdapter(),
             FilePolicyAdapter(),
+            HTTPJSONCheckAdapter(),
         )
     )
 
@@ -237,3 +293,52 @@ def _tail(output: BinaryIO) -> str:
     output.seek(max(0, size - _EVIDENCE_TAIL_BYTES))
     text = output.read().decode("utf-8", errors="replace")
     return " ".join(text.split()) or "no output"
+
+
+def _local_url(value: str) -> str:
+    from urllib.parse import urlsplit
+
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in {"127.0.0.1", "localhost"}
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        raise ValueError("http_json URL must use local HTTP")
+    return value
+
+
+def json_bytes(value: dict[str, object]) -> bytes:
+    import json
+
+    return json.dumps(value).encode("utf-8")
+
+
+def json_load(value: bytes) -> dict[str, object]:
+    import json
+
+    decoded = json.loads(value)
+    if not isinstance(decoded, dict):
+        raise ValueError("response must be a JSON object")
+    return decoded
+
+
+def _mismatches(
+    value: dict[str, object],
+    expected: dict[object, object],
+    contains: dict[object, object],
+) -> list[str]:
+    mismatches: list[str] = []
+    for key, item in expected.items():
+        if not isinstance(key, str):
+            raise ValueError("expected keys must be strings")
+        if value.get(key) != item:
+            mismatches.append(f"{key} did not equal expected value")
+    for key, item in contains.items():
+        if not isinstance(key, str) or not isinstance(item, str):
+            raise ValueError("contains entries must be string pairs")
+        actual = value.get(key)
+        if not isinstance(actual, str) or item not in actual:
+            mismatches.append(f"{key} did not contain expected text")
+    return mismatches
