@@ -1,31 +1,18 @@
 # Sentinel
 
-An agentic CI/CD release guardian that turns deterministic engineering evidence into an
-explainable release-risk assessment.
+The Python release-analysis CLI used by Backend Lab CI. Backend Lab owns its
+project policy, workflow integration,
+[architecture](https://github.com/mateoRc/lab/blob/main/content/docs/architecture/sentinel.md),
+and [roadmap](https://github.com/mateoRc/lab/blob/main/content/docs/roadmaps/sentinel.md).
 
-Sentinel is a pre-1.0 CLI. Its mock provider enables end-to-end testing before
-the production LLM integration is added.
-
-## How it works
-
-```text
-tests and scanners -> normalized evidence -> policy and risk
-                                      |
-                                      +-> mock/LLM explanation -> report
-```
-
-Deterministic checks own pass/fail decisions. Analysis providers explain the
-evidence but cannot override failed checks, write repositories, or deploy.
-Reports include sanitized findings and deterministic remediation actions;
-secret values and raw scanner output are never public dashboard data.
-
-## Run
+## Develop
 
 ```sh
 python -m pip install --editable .
+python -m unittest discover --start-directory tests --verbose
 ```
 
-Collect deterministic evidence from an allowlisted check plan:
+Collect evidence:
 
 ```sh
 sentinel collect \
@@ -34,7 +21,7 @@ sentinel collect \
   --output evidence.json
 ```
 
-Map changed paths to affected repositories, services, and check groups:
+Calculate affected checks:
 
 ```sh
 sentinel impact \
@@ -43,7 +30,7 @@ sentinel impact \
   --output impact.json
 ```
 
-Create the assessment:
+Create an assessment:
 
 ```sh
 sentinel assess \
@@ -53,21 +40,3 @@ sentinel assess \
   --json-output assessment.json \
   --markdown-output assessment.md
 ```
-
-With `advisory_only: true`, findings are reported without failing CI. Setting it
-to `false` makes blocked or approval-required decisions return a non-zero exit
-code.
-
-Sentinel centrally redacts common credentials and explicit check-environment
-secrets from retained evidence. Its local HTTP adapter supports deterministic
-service-contract and degradation assertions without allowing arbitrary network
-requests.
-
-Run tests with:
-
-```sh
-python -m unittest discover --start-directory tests --verbose
-```
-
-Backend Lab owns the project-specific configuration, architecture, and roadmap.
-Sentinel runs in CI and is not a persistent Docker Compose service.
