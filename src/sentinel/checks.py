@@ -27,7 +27,13 @@ class CheckAdapter(Protocol):
 
 class CheckRegistry:
     def __init__(self, adapters: tuple[CheckAdapter, ...]) -> None:
-        self._adapters = {adapter.kind: adapter for adapter in adapters}
+        self._adapters: dict[str, CheckAdapter] = {}
+        for adapter in adapters:
+            if not adapter.kind:
+                raise ValueError("check adapter kind must not be empty")
+            if adapter.kind in self._adapters:
+                raise ValueError(f"duplicate check adapter: {adapter.kind}")
+            self._adapters[adapter.kind] = adapter
 
     def run_all(
         self,
@@ -59,6 +65,7 @@ class CommandCheckAdapter:
         timeout = _timeout(specification.get("timeout_seconds", 600))
         environment = _environment(specification.get("environment", {}))
         expected_exit_code = _exit_code(specification.get("expected_exit_code", 0))
+        source = redact(" ".join(command), environment.values())
 
         started = time.monotonic()
         with tempfile.TemporaryFile() as output:
@@ -81,7 +88,7 @@ class CommandCheckAdapter:
                             f"completed with expected exit {expected_exit_code} "
                             f"in {duration:.1f}s"
                         ),
-                        redact(" ".join(command), environment.values()),
+                        source,
                     )
                 return Check(
                     name,
@@ -93,21 +100,21 @@ class CommandCheckAdapter:
                         ),
                         environment.values(),
                     ),
-                    redact(" ".join(command), environment.values()),
+                    source,
                 )
             except subprocess.TimeoutExpired:
                 return Check(
                     name,
                     CheckStatus.FAILED,
                     f"timed out after {timeout}s",
-                    redact(" ".join(command), environment.values()),
+                    source,
                 )
             except OSError as error:
                 return Check(
                     name,
                     CheckStatus.FAILED,
                     redact(f"could not start: {error}", environment.values()),
-                    redact(" ".join(command), environment.values()),
+                    source,
                 )
 
 

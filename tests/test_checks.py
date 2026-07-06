@@ -5,12 +5,19 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from sentinel.checks import (
+    CheckRegistry,
     CommandCheckAdapter,
     ExternalResultAdapter,
     FilePolicyAdapter,
     HTTPJSONCheckAdapter,
 )
 from sentinel.models import CheckStatus
+
+
+class CheckRegistryTest(unittest.TestCase):
+    def test_duplicate_adapter_kind_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "duplicate check adapter"):
+            CheckRegistry((CommandCheckAdapter(), CommandCheckAdapter()))
 
 
 class CommandCheckAdapterTest(unittest.TestCase):
